@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Simple Torrent</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- 頂部列 -->
+  <header class="topbar">
+    <div class="topbar-title">
+      <img class="logo" src="icon.png" alt="Simple Torrent">
+      <h1>Simple Torrent</h1>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="btnTheme" aria-label="切換主題">
+        <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg>
+      </button>
+      <button class="icon-btn" id="btnSettings" aria-label="設定">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94a7.14 7.14 0 0 0 .06-.94 7.14 7.14 0 0 0-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.3 7.3 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54a7.3 7.3 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.7 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.14 7.14 0 0 0-.06.94 7.14 7.14 0 0 0 .06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.71 1.63.94l.36 2.54a.5.5 0 0 0 .5.42h3.84a.5.5 0 0 0 .5-.42l.36-2.54c.58-.23 1.13-.55 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64Zm-7.14 2.06a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- 全域統計條 -->
+  <div class="stats-bar" id="statsBar">
+    <div class="stat stat-down">
+      <span class="stat-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 21h16"/></svg>
+      </span>
+      <span id="statDown">0 B/s</span>
+    </div>
+    <div class="stat stat-up">
+      <span class="stat-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 21V9m0 0 5 5m-5-5-5 5M4 3h16"/></svg>
+      </span>
+      <span id="statUp">0 B/s</span>
+    </div>
+    <div class="stat stat-count">
+      <span class="stat-icon">
+        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/></svg>
+      </span>
+      <span id="statCount">0 個任務</span>
+    </div>
+  </div>
+
+  <!-- 任務清單 -->
+  <main class="list" id="list"></main>
+
+  <!-- 空狀態 -->
+  <div class="empty-state" id="emptyState">
+    <svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 21h16"/></svg>
+    <p>還沒有任何下載任務</p>
+    <p class="hint">點右下角「+」新增磁力連結或 .torrent 檔</p>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" id="btnAdd" aria-label="新增下載">
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+
+</div>
+
+<!-- 遮罩 -->
+<div class="overlay" id="overlay"></div>
+
+<!-- 新增下載:底部面板 -->
+<div class="sheet" id="sheetAdd">
+  <div class="sheet-handle"></div>
+  <h2>新增下載</h2>
+  <p class="sheet-sub">貼上磁力連結,或選擇本機的 .torrent 檔</p>
+  <textarea id="inputMagnet" placeholder="magnet:?xt=urn:btih:..." rows="3"></textarea>
+  <div class="row-buttons">
+    <button class="btn-secondary" id="btnPaste">
+      <svg viewBox="0 0 24 24"><path d="M9 3h6v3H9zM6 6h12v15H6z"/></svg>
+      貼上剪貼簿
+    </button>
+    <button class="btn-secondary" id="btnPickFile">
+      <svg viewBox="0 0 24 24"><path d="M4 4h6l2 2h8v12H4z"/></svg>
+      選擇 .torrent 檔
+    </button>
+  </div>
+  <div class="sheet-actions">
+    <button class="btn-flat" id="btnAddCancel">取消</button>
+    <button class="btn-primary" id="btnAddConfirm">新增</button>
+  </div>
+</div>
+
+<!-- 設定:置中浮窗 -->
+<div class="float-dialog" id="dlgSettings">
+  <div class="float-head">
+    <h2>設定</h2>
+    <button class="icon-btn icon-btn-ghost" id="btnSettingsClose" aria-label="關閉">
+      <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+
+  <div class="field">
+    <label>下載速度限制 (KB/s,0 = 不限制)</label>
+    <input type="number" id="inputDownLimit" placeholder="0" inputmode="numeric">
+  </div>
+  <div class="field">
+    <label>上傳速度限制 (KB/s,0 = 不限制)</label>
+    <input type="number" id="inputUpLimit" placeholder="0" inputmode="numeric">
+  </div>
+  <div class="field field-row">
+    <label>下載完成後自動暫停</label>
+    <label class="switch">
+      <input type="checkbox" id="switchAutoPause">
+      <span class="slider"></span>
+    </label>
+  </div>
+  <div class="field field-row">
+    <label>深色模式</label>
+    <label class="switch">
+      <input type="checkbox" id="switchDarkMode">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="sheet-actions">
+    <button class="btn-flat" id="btnSettingsCancel">取消</button>
+    <button class="btn-primary" id="btnSettingsSave">儲存</button>
+  </div>
+
+  <div class="about">
+    <div class="about-row">
+      <span class="about-label">開發者</span>
+      <span class="about-value">Kencyue</span>
+    </div>
+    <div class="about-row">
+      <span class="about-value about-link" id="linkEmail" data-email="jingsyuan@gmail.com">jingsyuan@gmail.com</span>
+    </div>
+    <div class="about-row">
+      <span class="about-value about-link" id="linkWebsite" data-url="https://kencyue.github.io/">https://kencyue.github.io/</span>
+    </div>
+    <div class="about-version">Simple Torrent V2.0.0</div>
+  </div>
+</div>
+
+<!-- 檔案選擇:置中浮窗 -->
+<div class="float-dialog float-tall" id="dlgFiles">
+  <div class="float-head">
+    <h2>選擇要下載的檔案</h2>
+    <button class="icon-btn icon-btn-ghost" id="btnFilesClose" aria-label="關閉">
+      <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <div class="file-list" id="fileList"></div>
+  <div class="sheet-actions">
+    <button class="btn-flat" id="btnFilesCancel">取消</button>
+    <button class="btn-primary" id="btnFilesApply">套用</button>
+  </div>
+</div>
+
+<!-- 移除確認:置中浮窗 -->
+<div class="float-dialog float-narrow" id="dlgRemove">
+  <div class="float-head">
+    <h2 id="removeTitle">移除任務</h2>
+    <button class="icon-btn icon-btn-ghost" id="btnRemoveClose" aria-label="關閉">
+      <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <div class="option-list">
+    <button class="option-item" id="btnRemoveOnly">
+      <span>只移除任務</span>
+      <span class="option-sub">保留已下載的檔案</span>
+    </button>
+    <button class="option-item option-danger" id="btnRemoveDelete">
+      <span>移除任務並刪除檔案</span>
+      <span class="option-sub">此動作無法復原</span>
+    </button>
+  </div>
+  <div class="sheet-actions">
+    <button class="btn-flat" id="btnRemoveCancel">取消</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
