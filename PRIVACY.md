@@ -30,4 +30,7 @@ Simple Torrent is a general-purpose utility and is not specifically directed to 
 
 ## Contact
 
-For privacy questions, use the project's GitHub issue tracker: https://github.com/kencyue/SimpleTorrent/issues
+Developer: Kencyue
+
+For privacy questions, contact jingsyuan@gmail.com or use the project's GitHub issue tracker:
+https://github.com/kencyue/SimpleTorrent/issues

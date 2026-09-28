@@ -326,6 +326,9 @@ document.getElementById('linkEmail').addEventListener('click', (e) => {
 document.getElementById('linkWebsite').addEventListener('click', (e) => {
   bridgeCall('openUrl', e.currentTarget.getAttribute('data-url'));
 });
+document.getElementById('linkPrivacy').addEventListener('click', (e) => {
+  bridgeCall('openUrl', e.currentTarget.getAttribute('data-url'));
+});
 
 /* ---------- 檔案選擇(浮窗) ---------- */
 let filesSheetHash = null;
@@ -375,6 +378,8 @@ document.getElementById('btnRemoveDelete').addEventListener('click', () => {
 
 /* ---------- 啟動時先拉一次清單 ---------- */
 (function init() {
+  const version = bridgeCall('getAppVersion');
+  if (version) document.getElementById('appVersion').textContent = 'Simple Torrent V' + version;
   const raw = bridgeCall('getTorrents');
   if (raw) render(JSON.parse(raw));
 })();

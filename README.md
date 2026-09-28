@@ -34,7 +34,7 @@ SimpleTorrent is a lightweight, privacy-conscious BitTorrent client for Android.
 
 SimpleTorrent 的設計不需要帳號，也不需要將 Torrent 使用紀錄傳送至專案開發者的伺服器。Torrent/P2P 傳輸本身會依 BitTorrent 協定與其他 peers、trackers 或 DHT 節點進行網路通訊，因此使用者的 IP 位址可能會對參與同一 Torrent swarm 的其他節點可見。
 
-完整政策請參閱 [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md)。
+完整政策請參閱 [`PRIVACY.md`](PRIVACY.md)。
 
 ### 🧱 技術架構
 
@@ -128,7 +128,7 @@ Users add their own legally obtained magnet links or `.torrent` files and remain
 
 SimpleTorrent does not require an account and is not designed to send torrent history to a developer-operated backend. BitTorrent is a peer-to-peer protocol, however, so normal torrent operation communicates with peers, trackers, and/or DHT nodes. Your IP address may therefore be visible to other participants in the same torrent swarm.
 
-See [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md) for the full privacy policy.
+See [`PRIVACY.md`](PRIVACY.md) for the full privacy policy.
 
 ### 🧱 Technical Overview
 

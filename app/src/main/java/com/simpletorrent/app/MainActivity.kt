@@ -190,6 +190,13 @@ class MainActivity : AppCompatActivity() {
         fun getTorrents(): String = torrentsJson()
 
         @JavascriptInterface
+        fun getAppVersion(): String = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+        } catch (_: Exception) {
+            ""
+        }
+
+        @JavascriptInterface
         fun addMagnet(uri: String) {
             uiHandler.post { this@MainActivity.addMagnet(uri) }
         }
