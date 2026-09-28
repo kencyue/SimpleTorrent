@@ -103,7 +103,6 @@ class TorrentService : Service() {
     }
 
     private fun updateNotification() {
-        TorrentEngine.expireStaleMetadata()
         val items = TorrentEngine.allSnapshots()
         val activeItems = items.filter {
             it.state == TorrentItem.State.DOWNLOADING ||
