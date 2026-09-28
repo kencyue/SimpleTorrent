@@ -15,6 +15,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.DocumentsContract
 import android.webkit.JavascriptInterface
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
@@ -47,13 +48,18 @@ class MainActivity : AppCompatActivity() {
         webView = findViewById(R.id.webView)
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
+        webView.settings.cacheMode = WebSettings.LOAD_NO_CACHE
+        webView.clearCache(true)
         webView.addJavascriptInterface(Bridge(), "Android")
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String) {
                 super.onPageFinished(view, url)
                 view.evaluateJavascript(
-                    "document.getElementById('appVersion').textContent = " +
-                        JSONObject.quote("Simple Torrent V${BuildConfig.VERSION_NAME}"),
+                    "(function(){const el=document.getElementById('appVersion')" +
+                        "||document.querySelector('.about-version');" +
+                        "if(el)el.textContent=" +
+                        JSONObject.quote("Simple Torrent V${BuildConfig.VERSION_NAME}") +
+                        ";})()",
                     null
                 )
             }
