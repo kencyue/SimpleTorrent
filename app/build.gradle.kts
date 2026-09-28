@@ -22,8 +22,8 @@ android {
         applicationId = "com.simpletorrent.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 6
-        versionName = "2.1.5"
+        versionCode = 7
+        versionName = "2.1.6"
     }
 
     signingConfigs {

@@ -16,13 +16,16 @@ import com.frostwire.jlibtorrent.alerts.Alert
 import com.frostwire.jlibtorrent.alerts.TorrentAlert
 import com.frostwire.jlibtorrent.alerts.TorrentFinishedAlert // [新增] 匯入下載完成的 Alert
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 object TorrentEngine {
 
     private const val TAG = "TorrentEngine"
+    private const val METADATA_TIMEOUT_MS = 120_000L
     private var session: SessionManager? = null
     private var listener: ((String) -> Unit)? = null
     private var onEngineError: ((String) -> Unit)? = null
+    private val metadataStartedAt = ConcurrentHashMap<String, Long>()
 
     // [新增] 控制下載完成後是否自動暫停的開關 (預設為 false)
     var autoPauseOnFinish: Boolean = false
@@ -75,6 +78,7 @@ object TorrentEngine {
     fun stop() {
         session?.stop()
         session = null
+        metadataStartedAt.clear()
     }
 
     fun setUpdateListener(cb: ((String) -> Unit)?) {
@@ -141,10 +145,52 @@ object TorrentEngine {
     fun remove(infoHash: String, deleteFiles: Boolean) {
         val h = getHandle(infoHash) ?: return
         if (!h.isValid) return
+        metadataStartedAt.remove(infoHash)
         if (deleteFiles) {
             session?.remove(h, SessionHandle.DELETE_FILES)
         } else {
             session?.remove(h)
+        }
+    }
+
+    fun expireStaleMetadata() {
+        val s = session ?: return
+        val now = android.os.SystemClock.elapsedRealtime()
+        val activeHashes = mutableSetOf<String>()
+
+        try {
+            s.getTorrentHandles().forEach { h ->
+                if (!h.isValid) return@forEach
+
+                val status = h.status()
+                val hash = h.infoHash().toString()
+                activeHashes.add(hash)
+
+                if (status.hasMetadata()) {
+                    metadataStartedAt.remove(hash)
+                    return@forEach
+                }
+
+                val paused = status.flags().and_(TorrentFlags.PAUSED).nonZero()
+                if (paused) {
+                    metadataStartedAt.remove(hash)
+                    return@forEach
+                }
+
+                val startedAt = metadataStartedAt.putIfAbsent(hash, now) ?: now
+                if (now - startedAt >= METADATA_TIMEOUT_MS) {
+                    metadataStartedAt.remove(hash)
+                    s.remove(h)
+                    Log.w(TAG, "取得 metadata 逾時，已移除任務: $hash")
+                    onEngineError?.invoke(
+                        "取得 metadata 超過 120 秒，已停止並移除任務，請確認 Magnet 是否有效後重試"
+                    )
+                }
+            }
+
+            metadataStartedAt.keys.removeIf { it !in activeHashes }
+        } catch (t: Throwable) {
+            Log.w(TAG, "檢查 metadata timeout 失敗", t)
         }
     }
 
