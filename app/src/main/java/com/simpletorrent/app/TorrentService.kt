@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -13,8 +14,8 @@ import android.os.Looper
 import androidx.core.app.NotificationCompat
 
 /**
- * 前景服務:只要有任務在下載,就會顯示一個常駐通知,
- * 避免系統把 app 砍掉導致下載中斷。
+ * Foreground service used only while a user-initiated torrent transfer is active.
+ * This maps to the Play Console dataSync -> network upload/download use case.
  */
 class TorrentService : Service() {
 
@@ -46,20 +47,29 @@ class TorrentService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
-                // [新增] 使用者按下通知的「關閉」按鈕，立即結束服務
-                ticking = false
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                pauseActiveTransfers()
+                stopServiceNow()
                 return START_NOT_STICKY
             }
             else -> {
-                startForeground(NOTIF_ID, buildNotification("下載引擎啟動中..."))
+                startForeground(NOTIF_ID, buildNotification("下載引擎啟動中…"))
                 ticking = true
-                handler.removeCallbacks(tick) // 避免重複執行
+                handler.removeCallbacks(tick)
                 handler.post(tick)
             }
         }
-        return START_STICKY
+        // Do not recreate a transfer service unless the user explicitly starts/resumes work.
+        return START_NOT_STICKY
+    }
+
+    /** Android 15+ enforces a time budget for dataSync foreground services. */
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM &&
+            fgsType == ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        ) {
+            pauseActiveTransfers()
+            stopServiceNow()
+        }
     }
 
     override fun onDestroy() {
@@ -70,55 +80,56 @@ class TorrentService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun updateNotification() {
-        val items = TorrentEngine.allSnapshots()
-
-        // [新增] 判斷哪些狀態算「活躍中」(需要背景持續執行)
-        val activeItems = items.filter {
-            it.state == TorrentItem.State.DOWNLOADING ||
+    private fun pauseActiveTransfers() {
+        TorrentEngine.allSnapshots()
+            .filter {
+                it.state == TorrentItem.State.DOWNLOADING ||
                     it.state == TorrentItem.State.METADATA ||
                     it.state == TorrentItem.State.CHECKING ||
                     it.state == TorrentItem.State.SEEDING
+            }
+            .forEach { TorrentEngine.pause(it.infoHash) }
+    }
+
+    private fun stopServiceNow() {
+        ticking = false
+        handler.removeCallbacks(tick)
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    private fun updateNotification() {
+        val items = TorrentEngine.allSnapshots()
+        val activeItems = items.filter {
+            it.state == TorrentItem.State.DOWNLOADING ||
+                it.state == TorrentItem.State.METADATA ||
+                it.state == TorrentItem.State.CHECKING ||
+                it.state == TorrentItem.State.SEEDING
         }
 
-        // [新增] 如果完全沒有活躍任務，自動關閉背景服務與通知！
         if (activeItems.isEmpty()) {
-            ticking = false
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
+            stopServiceNow()
             return
         }
 
-        // 若有活躍任務，繼續更新通知上的數字與速度
         val activeCount = activeItems.count { it.state == TorrentItem.State.DOWNLOADING }
         val totalDown = items.sumOf { it.downloadRateBps }
-
         val text = if (activeCount > 0) {
             "下載中 $activeCount 個任務・${formatSpeed(totalDown)}"
         } else {
-            "處理中 (取得資訊/檢查檔案/做種)"
+            "處理中（取得資訊／檢查檔案／做種）"
         }
 
-        val mgr = getSystemService(NotificationManager::class.java)
-        mgr.notify(NOTIF_ID, buildNotification(text))
+        getSystemService(NotificationManager::class.java)
+            .notify(NOTIF_ID, buildNotification(text))
     }
 
     private fun buildNotification(text: String): Notification {
         val openIntent = Intent(this, MainActivity::class.java)
-
-        // 確保相容各版本的 PendingIntent Flags
-        val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
-
+        val piFlags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         val pi = PendingIntent.getActivity(this, 0, openIntent, piFlags)
 
-        // [新增] 建立一個給「關閉按鈕」專用的 Intent
-        val stopIntent = Intent(this, TorrentService::class.java).apply {
-            action = ACTION_STOP
-        }
+        val stopIntent = Intent(this, TorrentService::class.java).apply { action = ACTION_STOP }
         val stopPi = PendingIntent.getService(this, 1, stopIntent, piFlags)
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -127,16 +138,20 @@ class TorrentService : Service() {
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentIntent(pi)
             .setOngoing(true)
-            // [新增] 在推播通知下方加入「關閉背景執行」按鈕
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "關閉背景執行", stopPi)
+            .setOnlyAlertOnce(true)
+            .addAction(android.R.drawable.ic_media_pause, "暫停傳輸", stopPi)
             .build()
     }
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                CHANNEL_ID, "下載進度", NotificationManager.IMPORTANCE_LOW
-            )
+                CHANNEL_ID,
+                "Torrent 傳輸進度",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "顯示使用者啟動的 Torrent 下載與上傳狀態"
+            }
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
