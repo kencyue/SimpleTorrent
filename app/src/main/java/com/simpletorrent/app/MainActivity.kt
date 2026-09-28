@@ -10,8 +10,10 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.provider.DocumentsContract
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.appcompat.app.AppCompatActivity
@@ -27,6 +29,9 @@ class MainActivity : AppCompatActivity() {
     private val uiHandler = Handler(Looper.getMainLooper())
     private var refreshing = false
     private var modalOpen = false
+    private val alertRefresh = Runnable {
+        if (refreshing) pushTorrents()
+    }
 
     private val pickTorrentFile = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.GetContent()
@@ -57,6 +62,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         TorrentEngine.setErrorListener { message -> notifyJs(message) }
+        TorrentEngine.setUpdateListener {
+            uiHandler.removeCallbacks(alertRefresh)
+            uiHandler.postDelayed(alertRefresh, 120)
+        }
 
         val store = SettingsStore(this)
         TorrentEngine.autoPauseOnFinish = store.autoPauseOnFinish
@@ -74,12 +83,22 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refreshing = true
+        uiHandler.removeCallbacks(refreshLoop)
         uiHandler.post(refreshLoop)
     }
 
     override fun onPause() {
-        super.onPause()
         refreshing = false
+        uiHandler.removeCallbacks(refreshLoop)
+        uiHandler.removeCallbacks(alertRefresh)
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        uiHandler.removeCallbacks(refreshLoop)
+        uiHandler.removeCallbacks(alertRefresh)
+        TorrentEngine.setUpdateListener(null)
+        super.onDestroy()
     }
 
     private val refreshLoop = object : Runnable {
@@ -220,6 +239,16 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun openDownloadFolder(infoHash: String) {
+            uiHandler.post {
+                val path = TorrentEngine.snapshot(infoHash)?.savePath
+                    ?.takeIf { it.isNotBlank() }
+                    ?: SettingsStore(this@MainActivity).downloadDir(this@MainActivity)
+                openFolder(path)
+            }
+        }
+
+        @JavascriptInterface
         fun getSettings(): String {
             val store = SettingsStore(this@MainActivity)
             return JSONObject().apply {
@@ -281,5 +310,45 @@ class MainActivity : AppCompatActivity() {
         fun showToast(msg: String) {
             notifyJs(msg)
         }
+    }
+
+    private fun openFolder(path: String) {
+        val dir = File(path).apply { mkdirs() }
+        val primaryRoot = Environment.getExternalStorageDirectory()
+        val relative = try {
+            dir.relativeTo(primaryRoot).invariantSeparatorsPath
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+
+        if (relative != null) {
+            val documentUri = DocumentsContract.buildDocumentUri(
+                "com.android.externalstorage.documents",
+                "primary:$relative"
+            )
+
+            try {
+                startActivity(
+                    Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(documentUri, DocumentsContract.Document.MIME_TYPE_DIR)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                    }
+                )
+                return
+            } catch (_: Exception) {
+                try {
+                    startActivity(
+                        Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                            putExtra(DocumentsContract.EXTRA_INITIAL_URI, documentUri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                        }
+                    )
+                    return
+                } catch (_: Exception) {
+                }
+            }
+        }
+
+        notifyJs("無法開啟下載資料夾：${dir.absolutePath}")
     }
 }

@@ -77,7 +77,7 @@ object TorrentEngine {
         session = null
     }
 
-    fun setUpdateListener(cb: (String) -> Unit) {
+    fun setUpdateListener(cb: ((String) -> Unit)?) {
         listener = cb
     }
 

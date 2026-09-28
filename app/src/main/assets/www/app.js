@@ -184,7 +184,8 @@ function cardInnerHtml(t) {
       </div>
     </div>
     <div class="card-actions">
-      <button data-action="files" title="選擇檔案"><svg viewBox="0 0 24 24"><path d="M4 4h6l2 2h8v12H4z"/></svg></button>
+      <button data-action="files" title="選擇下載檔案"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg></button>
+      <button data-action="open-folder" title="開啟下載資料夾"${isTorrentComplete(t) ? '' : ' hidden'}><svg viewBox="0 0 24 24"><path d="M4 5h6l2 2h8v11H4z"/></svg></button>
       <button data-action="pause" title="暫停/繼續"><svg viewBox="0 0 24 24">${playIcon}</svg></button>
       <button data-action="remove" class="btn-remove" title="移除"><svg viewBox="0 0 24 24"><path d="M6 7h12M9 7V5h6v2m-8 0 1 13h8l1-13"/></svg></button>
     </div>`;
@@ -226,6 +227,9 @@ function updateCardEl(el, t) {
   pauseIconEl.innerHTML = t.state === 'PAUSED'
     ? '<path d="M8 5v14l11-7z"/>'
     : '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
+
+  const folderButton = el.querySelector('[data-action="open-folder"]');
+  if (folderButton) folderButton.hidden = !isTorrentComplete(t);
 }
 
 function escapeHtml(s) {
@@ -233,6 +237,10 @@ function escapeHtml(s) {
 }
 
 function findTorrent(hash) { return currentTorrents.find(t => t.infoHash === hash); }
+
+function isTorrentComplete(t) {
+  return t.state === 'FINISHED' || t.state === 'SEEDING' || t.progress >= 0.999;
+}
 
 
 function onCardAction(e) {
@@ -248,6 +256,8 @@ function onCardAction(e) {
     openRemoveSheet(item);
   } else if (action === 'files') {
     openFilesSheet(item);
+  } else if (action === 'open-folder') {
+    bridgeCall('openDownloadFolder', hash);
   }
 }
 
