@@ -29,9 +29,6 @@ class MainActivity : AppCompatActivity() {
     private val uiHandler = Handler(Looper.getMainLooper())
     private var refreshing = false
     private var modalOpen = false
-    private val alertRefresh = Runnable {
-        if (refreshing) pushTorrents()
-    }
 
     private val pickTorrentFile = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.GetContent()
@@ -62,10 +59,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         TorrentEngine.setErrorListener { message -> notifyJs(message) }
-        TorrentEngine.setUpdateListener {
-            uiHandler.removeCallbacks(alertRefresh)
-            uiHandler.postDelayed(alertRefresh, 120)
-        }
 
         val store = SettingsStore(this)
         TorrentEngine.autoPauseOnFinish = store.autoPauseOnFinish
@@ -90,14 +83,11 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         refreshing = false
         uiHandler.removeCallbacks(refreshLoop)
-        uiHandler.removeCallbacks(alertRefresh)
         super.onPause()
     }
 
     override fun onDestroy() {
         uiHandler.removeCallbacks(refreshLoop)
-        uiHandler.removeCallbacks(alertRefresh)
-        TorrentEngine.setUpdateListener(null)
         super.onDestroy()
     }
 

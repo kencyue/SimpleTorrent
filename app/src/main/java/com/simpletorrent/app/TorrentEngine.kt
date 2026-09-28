@@ -200,7 +200,7 @@ object TorrentEngine {
         val paused = st.flags().and_(TorrentFlags.PAUSED).nonZero()
 
         val state = when {
-            ti == null -> TorrentItem.State.METADATA
+            !st.hasMetadata() -> TorrentItem.State.METADATA
             paused -> TorrentItem.State.PAUSED
             st.isFinished && st.isSeeding -> TorrentItem.State.SEEDING
             st.isFinished -> TorrentItem.State.FINISHED
@@ -220,7 +220,7 @@ object TorrentEngine {
             progress = st.progress(),
             downloadRateBps = st.downloadPayloadRate().toLong(),
             uploadRateBps = st.uploadPayloadRate().toLong(),
-            totalSizeBytes = ti?.totalSize() ?: 0L,
+            totalSizeBytes = ti?.totalSize() ?: st.totalWanted(),
             state = state,
             savePath = h.savePath() ?: "",
             numFiles = ti?.numFiles() ?: 0,
