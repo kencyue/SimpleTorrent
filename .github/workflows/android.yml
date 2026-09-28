@@ -37,10 +37,42 @@ jobs:
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
 
-      - name: Build release APK and AAB
+      - name: Restore release signing key
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$SIGNING_KEY"
+          printf '%s' "$SIGNING_KEY" | base64 --decode > "$RUNNER_TEMP/simpletorrent-release.jks"
+
+      - name: Build signed release APK and AAB
+        if: github.event_name != 'pull_request'
+        env:
+          SIGNING_STORE_FILE: ${{ runner.temp }}/simpletorrent-release.jks
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew --no-daemon clean assembleRelease bundleRelease
 
+      - name: Build pull request
+        if: github.event_name == 'pull_request'
+        run: ./gradlew --no-daemon clean assembleDebug
+
+      - name: Verify APK signature
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APKSIGNER="$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner"
+          APK="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          test -x "$APKSIGNER"
+          test -n "$APK"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+
       - name: Collect release files
+        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           mkdir -p release-files
@@ -49,6 +81,7 @@ jobs:
           ls -lh release-files
 
       - name: Upload APK artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: SimpleTorrent-release-apk
@@ -56,6 +89,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload AAB artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: SimpleTorrent-release-aab
