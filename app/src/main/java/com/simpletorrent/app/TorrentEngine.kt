@@ -83,16 +83,19 @@ object TorrentEngine {
 
     fun addMagnet(uri: String, saveDir: File) {
         saveDir.mkdirs()
-        Thread {
-            try {
-                val data = session?.fetchMagnet(uri, 30, saveDir) ?: return@Thread
-                val ti = TorrentInfo.bdecode(data)
-                session?.download(ti, saveDir)
-            } catch (t: Throwable) {
-                Log.e(TAG, "新增磁力連結失敗: $uri", t)
-                onEngineError?.invoke("新增磁力連結失敗:${t.message ?: t.javaClass.simpleName}")
-            }
-        }.start()
+        try {
+            // Keep the magnet in the long-lived session from the beginning.
+            // fetchMagnet() uses a temporary handle that disappears after metadata
+            // is fetched, which caused the corresponding UI row to vanish.
+            session?.download(
+                uri,
+                saveDir,
+                com.frostwire.jlibtorrent.swig.torrent_flags_t()
+            )
+        } catch (t: Throwable) {
+            Log.e(TAG, "新增磁力連結失敗: $uri", t)
+            onEngineError?.invoke("新增磁力連結失敗:${t.message ?: t.javaClass.simpleName}")
+        }
     }
 
     fun addTorrentFile(torrentFile: File, saveDir: File) {

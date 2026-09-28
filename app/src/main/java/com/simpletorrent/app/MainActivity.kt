@@ -16,6 +16,7 @@ import android.os.Looper
 import android.provider.DocumentsContract
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -47,6 +48,16 @@ class MainActivity : AppCompatActivity() {
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.addJavascriptInterface(Bridge(), "Android")
+        webView.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String) {
+                super.onPageFinished(view, url)
+                view.evaluateJavascript(
+                    "document.getElementById('appVersion').textContent = " +
+                        JSONObject.quote("Simple Torrent V${BuildConfig.VERSION_NAME}"),
+                    null
+                )
+            }
+        }
         webView.loadUrl("file:///android_asset/www/index.html")
 
         onBackPressedDispatcher.addCallback(this) {
@@ -180,11 +191,7 @@ class MainActivity : AppCompatActivity() {
         fun getTorrents(): String = torrentsJson()
 
         @JavascriptInterface
-        fun getAppVersion(): String = try {
-            packageManager.getPackageInfo(packageName, 0).versionName ?: ""
-        } catch (_: Exception) {
-            ""
-        }
+        fun getAppVersion(): String = BuildConfig.VERSION_NAME
 
         @JavascriptInterface
         fun addMagnet(uri: String) {
